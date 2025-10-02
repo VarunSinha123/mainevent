@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% set hide_back = true %}
+
+{% block title %}Event Pass System - Home{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 40px;
+    }
+    .header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        color: white;
+    }
+    .menu-card {
+        background: white;
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        cursor: pointer;
+        transition: transform 0.3s;
+    }
+    .menu-card:hover {
+        transform: translateY(-5px);
+    }
+    .menu-card h2 {
+        color: #667eea;
+        margin-bottom: 10px;
+    }
+    .stats-card {
+        background: rgba(255,255,255,0.95);
+        border-radius: 15px;
+        padding: 20px;
+        margin-top: 30px;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+    .stat-value {
+        font-size: 2em;
+        font-weight: bold;
+        color: #667eea;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>🎉 Event Pass System</h1>
+        <p>New Year's Eve Party 2025</p>
+    </div>
+    
+    <div class="menu-card" onclick="location.href='/generate'">
+        <h2>📝 Generate Pass</h2>
+        <p>Create new event passes for attendees</p>
+    </div>
+    
+    <div class="menu-card" onclick="location.href='/view-passes'">
+        <h2>📋 View All Passes</h2>
+        <p>Browse all generated passes</p>
+    </div>
+    
+    <div class="menu-card" onclick="location.href='/scan'">
+        <h2>📱 Scan & Verify</h2>
+        <p>Verify passes at entry point</p>
+    </div>
+    
+    <div class="menu-card" onclick="location.href='/sponsor'">
+        <h2>🤝 Manage Sponsors</h2>
+        <p>Add and manage event sponsors</p>
+    </div>
+    
+    <div class="stats-card">
+        <h3 style="color: #667eea;">📊 Event Statistics</h3>
+        <div class="stats-grid" id="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="totalPasses">0</div>
+                <div class="stat-label">Total Passes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="scannedPasses">0</div>
+                <div class="stat-label">Scanned</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="pendingPasses">0</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="attendanceRate">0%</div>
+                <div class="stat-label">Attendance</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadStats() {
+        try {
+            const response = await fetch('/api/stats');
+            const stats = await response.json();
+            document.getElementById('totalPasses').textContent = stats.total;
+            document.getElementById('scannedPasses').textContent = stats.scanned;
+            document.getElementById('pendingPasses').textContent = stats.pending;
+            document.getElementById('attendanceRate').textContent = stats.attendance_rate + '%';
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+    
+    loadStats();
+    setInterval(loadStats, 5000);
+</script>
+{% endblock %}

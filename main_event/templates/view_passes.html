@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}View All Passes{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .filters {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filters input {
+        flex: 1;
+        min-width: 200px;
+    }
+    .passes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    .pass-item {
+        background: white;
+        border-radius: 15px;
+        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    .pass-item:hover {
+        transform: translateY(-5px);
+    }
+    .pass-item img {
+        width: 100%;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+    .pass-info {
+        font-size: 0.9em;
+        color: #666;
+    }
+    .pass-info strong {
+        color: #333;
+    }
+    .pass-serial {
+        font-family: monospace;
+        background: #f8f9fa;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin: 5px 0;
+        font-size: 0.85em;
+    }
+    .pass-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .pass-actions a {
+        flex: 1;
+        text-align: center;
+        padding: 8px;
+        background: #667eea;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-size: 0.9em;
+    }
+    .pass-actions a:hover {
+        background: #5568d3;
+    }
+    .no-passes {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: white;
+        font-size: 1.2em;
+    }
+    .pass-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.75em;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+    .badge-valid {
+        background: #d4edda;
+        color: #155724;
+    }
+    .badge-scanned {
+        background: #fff3cd;
+        color: #856404;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1>📋 All Generated Passes</h1>
+        
+        <div class="filters">
+            <input type="text" id="searchInput" placeholder="Search by name, serial, or ticket type...">
+            <select id="statusFilter">
+                <option value="all">All Status</option>
+                <option value="valid">Valid Only</option>
+                <option value="scanned">Scanned Only</option>
+            </select>
+        </div>
+        
+        <div id="passesContainer">
+            <div class="loading">Loading passes...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allPasses = [];
+    let scannedSerials = new Set();
+    
+    async function loadPasses() {
+        try {
+            const response = await fetch('/api/passes');
+            const data = await response.json();
+            
+            if (data.success) {
+                allPasses = data.passes;
+                
+                // Get scanned passes
+                const statsResponse = await fetch('/api/stats');
+                const stats = await statsResponse.json();
+                
+                renderPasses();
+            }
+        } catch (error) {
+            document.getElementById('passesContainer').innerHTML = 
+                '<div class="no-passes">Error loading passes</div>';
+        }
+    }
+    
+    function renderPasses() {
+        const container = document.getElementById('passesContainer');
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        
+        let filtered = allPasses.filter(pass => {
+            const matchesSearch = 
+                pass.attendee_name.toLowerCase().includes(searchTerm) ||
+                pass.serial_number.toLowerCase().includes(searchTerm) ||
+                pass.ticket_type.toLowerCase().includes(searchTerm);
+            
+            let matchesStatus = true;
+            if (statusFilter === 'valid') {
+                matchesStatus = pass.status === 'valid';
+            } else if (statusFilter === 'scanned') {
+                matchesStatus = scannedSerials.has(pass.serial_number);
+            }
+            
+            return matchesSearch && matchesStatus;
+        });
+        
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="no-passes">No passes found</div>';
+            return;
+        }
+        
+        container.innerHTML = '<div class="passes-grid">' + filtered.map(pass => `
+            <div class="pass-item">
+                <img src="${pass.pass_url}" alt="Pass ${pass.serial_number}">
+                <div class="pass-info">
+                    <strong>Pass #${pass.id}</strong>
+                    <div class="pass-serial">${pass.serial_number}</div>
+                    <div><strong>Name:</strong> ${pass.attendee_name}</div>
+                    <div><strong>Ticket:</strong> ${pass.ticket_type}</div>
+                    <div><strong>Event:</strong> ${pass.event_name}</div>
+                    <div><strong>Date:</strong> ${pass.event_date}</div>
+                    <span class="pass-badge ${pass.status === 'valid' ? 'badge-valid' : 'badge-scanned'}">
+                        ${pass.status.toUpperCase()}
+                    </span>
+                </div>
+                <div class="pass-actions">
+                    <a href="${pass.pass_url}" target="_blank">View</a>
+                    <a href="/api/download/${pass.serial_number}" download>Download</a>
+                </div>
+            </div>
+        `).join('') + '</div>';
+    }
+    
+    document.getElementById('searchInput').addEventListener('input', renderPasses);
+    document.getElementById('statusFilter').addEventListener('change', renderPasses);
+    
+    loadPasses();
+</script>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Sponsors{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+    .section h3 {
+        color: #667eea;
+        margin-bottom: 15px;
+    }
+    .sponsors-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    .sponsor-item {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .sponsor-item img {
+        max-width: 100%;
+        max-height: 80px;
+        margin-bottom: 10px;
+    }
+    .sponsor-item button {
+        width: 100%;
+        padding: 8px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+    .powered-by-preview {
+        margin-top: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 10px;
+        text-align: center;
+    }
+    .powered-by-preview img {
+        max-width: 150px;
+        max-height: 50px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1>🤝 Manage Sponsors & Branding</h1>
+        
+        <!-- Add Sponsor Section -->
+        <div class="section">
+            <h3>Add New Sponsor</h3>
+            <form id="sponsorForm">
+                <div class="form-group">
+                    <label>Sponsor Name *</label>
+                    <input type="text" id="sponsorName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Sponsor Logo * (PNG/JPG)</label>
+                    <input type="file" id="sponsorLogo" accept="image/*" required>
+                </div>
+                
+                <button type="submit" class="btn">Add Sponsor</button>
+            </form>
+        </div>
+        
+        <!-- Current Sponsors -->
+        <div class="section">
+            <h3>Current Sponsors</h3>
+            <div id="sponsorsList" class="sponsors-list">
+                <p style="text-align: center; color: #666;">No sponsors added yet</p>
+            </div>
+        </div>
+        
+        <!-- Powered By Section -->
+        <div class="section">
+            <h3>Update "Powered By" Branding</h3>
+            <form id="poweredByForm">
+                <div class="form-group">
+                    <label>Brand Name *</label>
+                    <input type="text" id="poweredByName" value="rave.live" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Brand Logo * (PNG/JPG)</label>
+                    <input type="file" id="poweredByLogo" accept="image/*" required>
+                </div>
+                
+                <button type="submit" class="btn">Update Powered By</button>
+            </form>
+            
+            <div id="poweredByPreview" class="powered-by-preview" style="display: none;">
+                <p><strong>Current "Powered By":</strong></p>
+                <p id="currentPoweredByName"></p>
+                <img id="currentPoweredByLogo" alt="Powered By Logo">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load sponsors
+    async function loadSponsors() {
+        try {
+            const response = await fetch('/api/sponsor');
+            const data = await response.json();
+            
+            const container = document.getElementById('sponsorsList');
+            
+            if (data.success && data.sponsors.length > 0) {
+                container.innerHTML = data.sponsors.map(sponsor => `
+                    <div class="sponsor-item">
+                        <img src="${sponsor.logo_url}" alt="${sponsor.name}">
+                        <p><strong>${sponsor.name}</strong></p>
+                        <button onclick="removeSponsor('${sponsor.name}')">Remove</button>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p style="text-align: center; color: #666;">No sponsors added yet</p>';
+            }
+        } catch (error) {
+            console.error('Error loading sponsors:', error);
+        }
+    }
+    
+    // Load powered by
+    async function loadPoweredBy() {
+        try {
+            const response = await fetch('/api/powered-by');
+            const data = await response.json();
+            
+            if (data && data.name) {
+                document.getElementById('poweredByPreview').style.display = 'block';
+                document.getElementById('currentPoweredByName').textContent = data.name;
+                if (data.logo_url) {
+                    document.getElementById('currentPoweredByLogo').src = data.logo_url;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading powered by:', error);
+        }
+    }
+    
+    // Add sponsor
+    document.getElementById('sponsorForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('name', document.getElementById('sponsorName').value);
+        formData.append('logo', document.getElementById('sponsorLogo').files[0]);
+        
+        try {
+            const response = await fetch('/api/sponsor', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Sponsor added successfully!');
+                loadSponsors();
+                document.getElementById('sponsorForm').reset();
+            } else {
+                alert('❌ Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('❌ Failed to add sponsor');
+        }
+    });
+    
+    // Update powered by
+    document.getElementById('poweredByForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('name', document.getElementById('poweredByName').value);
+        formData.append('logo', document.getElementById('poweredByLogo').files[0]);
+        
+        try {
+            const response = await fetch('/api/powered-by', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Powered By updated successfully! It will appear on all future passes.');
+                loadPoweredBy();
+                document.getElementById('poweredByForm').reset();
+                document.getElementById('poweredByName').value = 'rave.live';
+            } else {
+                alert('❌ Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('❌ Failed to update');
+        }
+    });
+    
+    // Remove sponsor
+    async function removeSponsor(name) {
+        if (!confirm(`Remove sponsor "${name}"?`)) return;
+        
+        try {
+            const response = await fetch(`/api/sponsor/${encodeURIComponent(name)}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Sponsor removed');
+                loadSponsors();
+            }
+        } catch (error) {
+            alert('❌ Failed to remove sponsor');
+        }
+    }
+    
+    loadSponsors();
+    loadPoweredBy();
+</script>
+{% endblock %}

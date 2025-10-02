@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Pass{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .result {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        display: none;
+    }
+    .result.success {
+        display: block;
+        border-left: 4px solid #28a745;
+    }
+    .pass-preview img {
+        max-width: 100%;
+        border-radius: 10px;
+        margin-top: 15px;
+    }
+    .download-btn {
+        display: inline-block;
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+    }
+    .download-btn:hover {
+        background: #218838;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1>📝 Generate Event Pass</h1>
+        
+        <form id="generateForm">
+            <div class="form-group">
+                <label>Attendee Name *</label>
+                <input type="text" id="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Ticket Type *</label>
+                <select id="ticketType" required>
+                    <option value="STAG">STAG (1 Guest)</option>
+                    <option value="Couple">Couple (2 Guests)</option>
+                    <option value="Group of 5">Group of 5 (5 Guests)</option>
+                    <option value="Student">Student</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Event Name *</label>
+                <input type="text" id="eventName" value="SAVORA" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Event Date *</label>
+                <input type="text" id="eventDate" value="DECEMBER 31ST" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Venue *</label>
+                <input type="text" id="venue" value="Swagatam Banquet Hall, Harmu, Ranchi" required>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">Generate Pass</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('generateForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Generating...';
+        
+        const data = {
+            name: document.getElementById('name').value,
+            ticketType: document.getElementById('ticketType').value,
+            eventName: document.getElementById('eventName').value,
+            eventDate: document.getElementById('eventDate').value,
+            venue: document.getElementById('venue').value
+        };
+        
+        try {
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const res = await response.json();
+            
+            if (res.success) {
+                document.getElementById('result').className = 'result success';
+                document.getElementById('result').innerHTML = `
+                    <h3>✅ Pass Generated Successfully!</h3>
+                    <p><strong>Pass ID:</strong> #${res.id}</p>
+                    <p><strong>Serial:</strong> ${res.serial_number}</p>
+                    <div class="pass-preview">
+                        <img src="${res.pass_url}">
+                        <br>
+                        <a href="/api/download/${res.serial_number}" class="download-btn">📥 Download Pass</a>
+                        <a href="/view-passes" class="download-btn" style="background: #667eea;">📋 View All Passes</a>
+                    </div>
+                `;
+                
+                // Reset form
+                document.getElementById('generateForm').reset();
+                document.getElementById('eventName').value = 'SAVORA';
+                document.getElementById('eventDate').value = 'DECEMBER 31ST';
+                document.getElementById('venue').value = 'Swagatam Banquet Hall, Harmu, Ranchi';
+            }
+        } catch (error) {
+            alert('Failed to generate pass: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Generate Pass';
+        }
+    });
+</script>
+{% endblock %}

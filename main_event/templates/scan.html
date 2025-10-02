@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Scan & Verify Pass{% endblock %}
+
+{% block extra_styles %}
+<style>
+    #reader {
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+    .manual-input {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 2px solid #e0e0e0;
+    }
+    .result {
+        margin-top: 20px;
+        padding: 20px;
+        border-radius: 10px;
+        display: none;
+    }
+    .result.valid {
+        display: block;
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+    .result.invalid {
+        display: block;
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+    .result h2 {
+        margin-bottom: 15px;
+    }
+    .result .detail {
+        margin: 8px 0;
+        font-size: 1.1em;
+    }
+    .toggle-camera {
+        margin-bottom: 15px;
+    }
+    .toggle-camera button {
+        padding: 10px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1>📱 Scan QR Code</h1>
+        
+        <div class="toggle-camera">
+            <button id="toggleBtn" onclick="toggleScanner()">Start Camera Scanner</button>
+        </div>
+        
+        <div id="reader" style="display: none;"></div>
+        
+        <div class="manual-input">
+            <h3 style="margin-bottom: 15px; color: #667eea;">Or Enter Serial Number</h3>
+            <input type="text" id="serialInput" placeholder="NYE2025-XXXX-XXXXXX">
+            <button class="btn" onclick="verifyManual()" style="margin-top: 10px;">Verify Pass</button>
+        </div>
+    </div>
+    
+    <div id="result" class="result"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+    let html5QrcodeScanner = null;
+    let isScanning = false;
+    
+    function toggleScanner() {
+        const reader = document.getElementById('reader');
+        const toggleBtn = document.getElementById('toggleBtn');
+        
+        if (!isScanning) {
+            reader.style.display = 'block';
+            toggleBtn.textContent = 'Stop Scanner';
+            startScanner();
+        } else {
+            stopScanner();
+            reader.style.display = 'none';
+            toggleBtn.textContent = 'Start Camera Scanner';
+        }
+        isScanning = !isScanning;
+    }
+    
+    function startScanner() {
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader",
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            false
+        );
+        
+        html5QrcodeScanner.render(onScanSuccess);
+    }
+    
+    function stopScanner() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.clear();
+        }
+    }
+    
+    function onScanSuccess(decodedText) {
+        try {
+            const data = JSON.parse(decodedText);
+            verifyPass(data.serial);
+        } catch (e) {
+            verifyPass(decodedText);
+        }
+        stopScanner();
+        document.getElementById('reader').style.display = 'none';
+        document.getElementById('toggleBtn').textContent = 'Start Camera Scanner';
+        isScanning = false;
+    }
+    
+    function verifyManual() {
+        const serial = document.getElementById('serialInput').value.trim();
+        if (serial) {
+            verifyPass(serial);
+        }
+    }
+    
+    async function verifyPass(serialNumber) {
+        const result = document.getElementById('result');
+        result.innerHTML = '<p style="text-align: center;">Verifying...</p>';
+        result.className = 'result';
+        result.style.display = 'block';
+        
+        try {
+            const response = await fetch('/api/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serial_number: serialNumber })
+            });
+            
+            const data = await response.json();
+            
+            if (data.valid) {
+                result.className = 'result valid';
+                result.innerHTML = `
+                    <h2>✅ ${data.message}</h2>
+                    <div class="detail"><strong>Pass ID:</strong> #${data.details.id}</div>
+                    <div class="detail"><strong>Name:</strong> ${data.details.attendee_name}</div>
+                    <div class="detail"><strong>Ticket:</strong> ${data.details.ticket_type}</div>
+                    <div class="detail"><strong>Event:</strong> ${data.details.event_name}</div>
+                    <div class="detail"><strong>Serial:</strong> ${data.details.serial_number}</div>
+                    <div class="detail" style="margin-top: 15px; color: #28a745; font-size: 1.3em;">
+                        <strong>🎉 ENTRY GRANTED</strong>
+                    </div>
+                `;
+            } else {
+                result.className = 'result invalid';
+                let details = '';
+                if (data.details) {
+                    details = `
+                        <div class="detail"><strong>Pass ID:</strong> #${data.details.id}</div>
+                        <div class="detail"><strong>Name:</strong> ${data.details.attendee_name}</div>
+                        <div class="detail"><strong>Serial:</strong> ${data.details.serial_number}</div>
+                    `;
+                    if (data.scanned_at) {
+                        details += `<div class="detail"><strong>Scanned at:</strong> ${new Date(data.scanned_at).toLocaleString()}</div>`;
+                    }
+                }
+                result.innerHTML = `
+                    <h2>❌ ${data.message}</h2>
+                    ${details}
+                    <div class="detail" style="margin-top: 15px; color: #dc3545; font-size: 1.3em;">
+                        <strong>🚫 ENTRY DENIED</strong>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            result.className = 'result invalid';
+            result.innerHTML = '<h2>❌ Error</h2><p>Failed to verify pass.</p>';
+        }
+    }
+    
+    document.getElementById('serialInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            verifyManual();
+        }
+    });
+</script>
+{% endblock %}
